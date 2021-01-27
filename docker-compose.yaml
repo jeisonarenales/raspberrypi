@@ -1,0 +1,92 @@
+version: "3"
+
+services:
+  duckdns:
+    image: linuxserver/duckdns
+    container_name: duckdns
+    environment:
+      - TZ=${TZ}
+      - SUBDOMAINS=${DUCKDNS_SUBDOMAINS}
+      - TOKEN=${DUCKDNS_TOKEN}
+    restart: unless-stopped
+
+  pihole:
+    container_name: pihole
+    image: pihole/pihole
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "67:67/udp"
+      - "80:80/tcp"
+      - "443:443/tcp"
+    environment:
+      TZ: ${TZ}
+      WEBPASSWORD: ${PIHOLE_PASS}
+    volumes:
+      - ${APPS}/pihole/etc/:/etc/pihole/
+      - ${APPS}/pihole/etc-dnsmasq.d/:/etc/dnsmasq.d/
+    dns:
+      - 127.0.0.1
+      - 1.1.1.1
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+
+  transmission:
+    image: linuxserver/transmission
+    container_name: transmission
+    environment:
+      - PUID=${PUID}
+      - PGID=${PUID}
+      - USER=${TR_USER}
+      - PASS=${TR_PASS}
+      - TZ=${TZ}
+    volumes:
+      - ${APPS}/transmission/config:/config
+      - ${DOWNLOADS}:/downloads
+      - ${APPS}/transmission/watch:/watch
+    ports:
+      - 9091:9091
+      - 51413:51413
+      - 51413:51413/udp
+    expose:
+      - 9091
+    restart: unless-stopped
+
+  flexget:
+    image: wiserain/flexget
+    container_name: flexget
+    volumes:
+      - ${APPS}/flexget:/config
+      - ${DOWNLOADS}:/downloads
+      - ${MEDIA}:/storage
+    ports:
+      - 3539:3539
+      - 5050:5050
+    environment:
+      - PUID=${PUID}
+      - PGID=${PUID}
+      - TORRENT_PLUGIN=transmission
+      - FG_WEBUI_PASSWD=${TR_PASS}
+      - FG_LOG_LEVEL=info
+      - TZ=${TZ}
+    restart: unless-stopped
+    links:
+      - transmission
+
+  plex:
+    image: plexinc/pms-docker
+    container_name: plex-container
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - PLEX_UID=${PUID}
+      - PLEX_GID=${PUID}
+      - TZ=${TZ}
+      - PLEX_CLAIM=claim-QgkyhVyjxywwudVT84qL
+      - ADVERTISE_IP="http://localhost:32400/"
+      - HOSTNAME=PlexServer
+    volumes:
+      - ${APPS}/plex/config:/config
+      - ${APPS}/plex/tmp:/transcode
+      - ${MEDIA}:/data  
